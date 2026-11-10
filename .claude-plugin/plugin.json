@@ -1,0 +1,6 @@
+{
+  "name": "dynamic-island",
+  "version": "0.1.0",
+  "description": "灵动岛：在输入框上方用一枚黑色胶囊实时显示当前会话的任务进度、正在运行的工具和子任务，点击展开完整任务列表",
+  "types": "./types/index.d.ts"
+}

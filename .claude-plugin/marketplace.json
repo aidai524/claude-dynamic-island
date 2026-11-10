@@ -1,0 +1,11 @@
+{
+  "name": "claude-dynamic-island",
+  "owner": { "name": "aidai524" },
+  "plugins": [
+    {
+      "name": "dynamic-island",
+      "source": "./",
+      "description": "灵动岛：屏幕顶部的黑色胶囊汇总所有 Claude Code 会话的进度，点一下或悬停展开"
+    }
+  ]
+}
