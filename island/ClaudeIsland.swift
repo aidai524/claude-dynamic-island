@@ -572,7 +572,6 @@ struct ExpandedIsland: View {
     @ObservedObject var ui: ScreenUI
     let onOpen: (Row) -> Void
     let onHide: () -> Void
-    let onQuit: () -> Void
 
     private var summary: String {
         let alive = rows.filter { $0.tone.isAlive }.count
@@ -610,7 +609,6 @@ struct ExpandedIsland: View {
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("隐藏 1 小时", action: onHide).buttonStyle(.plain).foregroundStyle(.secondary)
-                Button("退出", action: onQuit).buttonStyle(.plain).foregroundStyle(.secondary)
             }
             .font(.system(size: 11))
             .padding(.horizontal, 8)
@@ -639,7 +637,6 @@ struct IslandRoot: View {
     var onExpand: () -> Void = {}
     let onOpen: (Row) -> Void
     let onHide: () -> Void
-    let onQuit: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -663,7 +660,7 @@ struct IslandRoot: View {
 
     @ViewBuilder private var content: some View {
         if ui.isExpanded, !store.rows.isEmpty {
-            ExpandedIsland(rows: store.rows, ui: ui, onOpen: onOpen, onHide: onHide, onQuit: onQuit)
+            ExpandedIsland(rows: store.rows, ui: ui, onOpen: onOpen, onHide: onHide)
         } else if let peek = store.peek {
             PeekIsland(row: peek, ui: ui, onExpand: onExpand)
         } else if !store.rows.isEmpty {
@@ -718,8 +715,7 @@ final class ScreenController {
             store: store, ui: ui,
             onExpand: { [weak self] in self?.expand() },
             onOpen: { [weak app] row in app?.open(row) },
-            onHide: { [weak app] in app?.hideForAnHour() },
-            onQuit: { [weak app] in app?.quitForGood() })
+            onHide: { [weak app] in app?.hideForAnHour() })
         let host = FirstClickHostingView(rootView: root)
         host.frame = NSRect(origin: .zero, size: Self.panelSize)
         panel.contentView = host
@@ -817,7 +813,7 @@ final class AppController: NSObject, NSApplicationDelegate {
     private var timers: [Timer] = []
 
     static let home = FileManager.default.homeDirectoryForCurrentUser
-    /// Written by 退出: the plugin starts no island while it stands.
+    /// Written by `/island app off`: the plugin starts no island while it stands.
     static let offFlag = home.appendingPathComponent(".claude/dynamic-island/off")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -877,13 +873,6 @@ final class AppController: NSObject, NSApplicationDelegate {
         screens.forEach { $0.collapse() }
         store.hide(for: 3600)
     }
-
-    func quitForGood() {
-        let dir = Self.offFlag.deletingLastPathComponent()
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        FileManager.default.createFile(atPath: Self.offFlag.path, contents: Data())
-        NSApp.terminate(nil)
-    }
 }
 
 // MARK: - Previews without a screen
@@ -928,7 +917,7 @@ func renderSnapshots(to dir: URL, live: Bool) {
             if notch {
                 IslandShape(radius: 10).fill(.black).frame(width: ui.notchWidth, height: ui.barHeight)
             }
-            IslandRoot(store: store, ui: ui, onOpen: { _ in }, onHide: {}, onQuit: {})
+            IslandRoot(store: store, ui: ui, onOpen: { _ in }, onHide: {})
         }
         .frame(width: 760, height: expanded ? 300 : 70)
         let renderer = ImageRenderer(content: view)

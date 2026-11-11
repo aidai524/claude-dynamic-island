@@ -44,7 +44,9 @@ claude plugin install dynamic-island --marketplace aidai524/claude-dynamic-islan
 
 它会用插件自带的源码编译 `~/Applications/ClaudeIsland.app` 并打开。编译需要 Xcode 命令行工具；没装的话会提示你先在终端运行 `xcode-select --install`。插件更新后再运行一次，就会换成新版本。
 
-装好以后，每个 Claude Code 会话开始时会自动打开它，不加开机启动项。
+装好以后，每个 Claude Code 会话开始时会自动打开它，每轮任务开始时（最多每分钟一次）也会检查一下。程序意外退出或电脑重启后，下一轮任务一开始它就会回来。不加开机启动项。
+
+想彻底关掉屏幕灵动岛，在会话里输入 `/island app off`，之后它不会再自动打开；输入 `/island app` 可以重新打开。
 
 ## 屏幕顶部显示什么
 
@@ -68,10 +70,7 @@ claude plugin install dynamic-island --marketplace aidai524/claude-dynamic-islan
 - 子任务
 - 计时
 
-点一行会打开 Claude。底部有两个按钮：
-
-- **隐藏 1 小时：** 暂时不显示。
-- **退出：** 关掉程序，之后也不再自动打开；想恢复就双击 `~/Applications/ClaudeIsland.app`。
+点一行会打开 Claude。底部的「隐藏 1 小时」可以让它暂时不显示。
 
 胶囊以外的地方，点击照常落到菜单栏和下面的窗口。
 
@@ -87,6 +86,7 @@ claude plugin install dynamic-island --marketplace aidai524/claude-dynamic-islan
 
 - `/island on`：显示，点「展开」看完整任务列表
 - `/island off`：收起
+- `/island app`、`/island app off`：打开、关闭屏幕顶部的灵动岛
 - `/island`：切换
 
 这个选择会记住，新会话沿用。
@@ -104,7 +104,7 @@ claude plugin install dynamic-island --marketplace aidai524/claude-dynamic-islan
 
 全部在本机，不联网：
 
-- **写：** `~/.claude/dynamic-island/sessions/*.json`（每个会话一份进度）；点「退出」时写 `~/.claude/dynamic-island/off`。
+- **写：** `~/.claude/dynamic-island/sessions/*.json`（每个会话一份进度）；运行 `/island app off` 时写 `~/.claude/dynamic-island/off`。
 - **读：** 上面这些文件；Claude 桌面客户端的会话记录 `~/Library/Application Support/Claude/claude-code-sessions/**/local_*.json`，只读取标题、是否归档和最后打开时间。
 
 超过一天没更新的会话文件会被自动清理。

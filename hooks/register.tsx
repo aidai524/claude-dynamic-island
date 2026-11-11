@@ -162,6 +162,8 @@ let home: string | undefined
 let sessionId: string | undefined
 let sessionCwd = ''
 let publishTimer: Timer | undefined
+/** When a turn last made sure the screen island runs, epoch ms. */
+let lastLaunchAt = 0
 
 /** Writes this session's file for the screen island, now. */
 async function publish($: EngineInterface, closed = false): Promise<void> {
@@ -310,6 +312,34 @@ async function launchIsland($: EngineInterface, homeDir: string): Promise<void> 
 }
 
 /**
+ * A turn makes sure the island runs, at most once a minute: one that quit or
+ * a Mac that restarted comes back with the next task, not the next session.
+ * On a timer of its own, so the turn never waits on it.
+ */
+function relaunchSoon($: EngineInterface): void {
+  if (home === undefined) return
+  const homeDir = home
+  $.clock.after(50, () => {
+    void quietly(async () => {
+      const at = await $.clock.now()
+      if (at - lastLaunchAt < 60_000) return
+      lastLaunchAt = at
+      await launchIsland($, homeDir)
+    })
+  })
+}
+
+/** `/island app off`: closes the screen island and keeps it closed. */
+async function stopIsland($: EngineInterface): Promise<string> {
+  const homeDir = await $.env.get('HOME')
+  if (!homeDir) return '找不到 HOME 目录，没法关闭屏幕灵动岛。'
+  await $.fs.write(`${homeDir}/${OFF_FLAG}`, '')
+  await $.process.run(['/usr/bin/pkill', '-x', 'ClaudeIsland'], { timeoutMs: 15_000 }).catch(() => undefined)
+
+  return '屏幕灵动岛已关闭，之后也不会自动打开；输入 /island app 可以重新打开。'
+}
+
+/**
  * `/island app`: builds the screen island from the plugin's own source into
  * ~/Applications and opens it, a running copy replaced. One command after
  * installing the plugin; again after an update.
@@ -349,8 +379,9 @@ export const register: Register = on => {
     await quietly(async () => {
       await $.command.register({
         name: 'island',
-        description: '灵动岛：on/off 显示或收起输入框上方的胶囊，app 编译并打开屏幕顶部的灵动岛',
-        argumentHint: '[on|off|app]',
+        description:
+          '灵动岛：on/off 显示或收起输入框上方的胶囊；app 编译并打开屏幕顶部的灵动岛，app off 关掉它',
+        argumentHint: '[on|off|app|app off]',
       })
       // Hidden unless the person turned the capsule on with /island on.
       const hidden = (await $.store.get('hidden')) !== false
@@ -388,7 +419,15 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'island' }, async ($, e) => {
-    if (e.args.trim().toLowerCase() === 'app') {
+    const arg = e.args.trim().toLowerCase().replace(/\s+/g, ' ')
+    if (arg === 'app off' || arg === 'app stop') {
+      const text = await stopIsland($).catch(
+        (error: unknown) => `屏幕灵动岛没关上：${error instanceof Error ? error.message : String(error)}`,
+      )
+
+      return { text }
+    }
+    if (arg === 'app') {
       const text = await installIsland($).catch(
         (error: unknown) => `屏幕灵动岛没装上：${error instanceof Error ? error.message : String(error)}`,
       )
@@ -420,6 +459,7 @@ export const register: Register = on => {
         await update($, recent, list => list.filter(one => one.status !== 'running').slice(-6))
         startTicker($)
         publishSoon($)
+        relaunchSoon($)
       })
     }
 

@@ -315,3 +315,61 @@ test('/island app says what to install when Xcode tools are missing', async ($, 
   expect(String(ran.text)).toContain('xcode-select --install')
   expect(runs.length).toBe(1)
 })
+
+test('/island app off closes the screen island and keeps it closed', async ($, on) => {
+  mock.env(on, { HOME: '/Users/test' })
+  const writes: string[] = []
+  const runs: (readonly string[])[] = []
+  on('fs.write', (_, e) => {
+    writes.push(e.path)
+
+    return { value: undefined }
+  })
+  on('process.run', (_, e) => {
+    runs.push(e.argv)
+
+    return { value: RAN }
+  })
+
+  const ran = (await $.command.run({ command: 'island', args: 'app off' } as never)) as { text?: string }
+
+  expect(String(ran.text)).toContain('已关闭')
+  expect(writes).toEqual(['/Users/test/.claude/dynamic-island/off'])
+  expect(runs).toEqual([['/usr/bin/pkill', '-x', 'ClaudeIsland']])
+})
+
+test('each turn makes sure the screen island runs, at most once a minute', async ($, on) => {
+  const clock = mock.clock(on, { now: 9_000_000 })
+  mock.store(on)
+  mock.env(on, { HOME: '/Users/test' })
+  const opens: (readonly string[])[] = []
+  on('fs.write', () => ({ value: undefined }))
+  on('fs.exists', (_, e) => ({ value: !e.path.endsWith('/off') }))
+  on('process.run', (_, e) => {
+    if (e.argv[0] === '/usr/bin/open') opens.push(e.argv)
+
+    return { value: RAN }
+  })
+  on('session.id', () => ({ value: 'sess-2' }))
+  on('session.messages', () => ({ value: [] }))
+  on('command.register', () => ({ value: { command: 'island' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('agent.list', () => ({ value: [] }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+
+  await $.session.start({ cwd: '/Users/test/proj', surface: 'desktop', isInteractive: true })
+  const atStart = opens.length
+
+  await $.turn.start({ text: '第一轮', turnId: 't1' } as never)
+  await clock.advance(200)
+  expect(opens.length).toBe(atStart + 1)
+
+  await $.turn.start({ text: '第二轮', turnId: 't2' } as never)
+  await clock.advance(200)
+  expect(opens.length).toBe(atStart + 1)
+
+  await clock.advance(61_000)
+  await $.turn.start({ text: '第三轮', turnId: 't3' } as never)
+  await clock.advance(200)
+  expect(opens.length).toBe(atStart + 2)
+})
